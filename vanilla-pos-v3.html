@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vanilla – نظام الكاشير</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='bg' cx='50%25' cy='40%25' r='60%25'%3E%3Cstop offset='0%25' stop-color='%23C41E3A'/%3E%3Cstop offset='100%25' stop-color='%238B0000'/%3E%3C/radialGradient%3E%3ClinearGradient id='gold' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23f0d060'/%3E%3Cstop offset='100%25' stop-color='%23c9a84c'/%3E%3C/linearGradient%3E%3ClinearGradient id='bottle' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23f5e6c8'/%3E%3Cstop offset='100%25' stop-color='%23d4b87a'/%3E%3C/linearGradient%3E%3C/defs%3E%3C!-- background circle --%3E%3Ccircle cx='16' cy='16' r='16' fill='url(%23bg)'/%3E%3C!-- perfume bottle body --%3E%3Crect x='10' y='15' width='12' height='12' rx='2.5' fill='url(%23bottle)' opacity='.95'/%3E%3C!-- bottle shoulder --%3E%3Crect x='11.5' y='13' width='9' height='3' rx='1.5' fill='url(%23bottle)'/%3E%3C!-- bottle neck --%3E%3Crect x='13.5' y='9.5' width='5' height='4' rx='1' fill='url(%23bottle)'/%3E%3C!-- cap --%3E%3Crect x='12.5' y='7' width='7' height='3.5' rx='1.5' fill='url(%23gold)'/%3E%3C!-- nozzle --%3E%3Crect x='15.2' y='5' width='1.6' height='2.5' rx='.8' fill='url(%23gold)'/%3E%3C!-- shine on bottle --%3E%3Crect x='11.5' y='15.5' width='2.5' height='7' rx='1.2' fill='white' opacity='.22'/%3E%3C!-- label --%3E%3Crect x='11.2' y='18' width='9.6' height='6' rx='1' fill='%238B0000' opacity='.35'/%3E%3C!-- label text implied by gold line --%3E%3Crect x='12.5' y='19.5' width='7' height='.8' rx='.4' fill='url(%23gold)' opacity='.9'/%3E%3Crect x='13.5' y='21.2' width='5' height='.8' rx='.4' fill='url(%23gold)' opacity='.7'/%3E%3C!-- sparkle top-right --%3E%3Ctext x='22' y='10' font-size='6' text-anchor='middle' dominant-baseline='middle'%3E✦%3C/text%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --crimson:     #8B0000;
+    --crimson-mid: #A31515;
+    --crimson-glow:#C41E3A;
+    --graphite:    #1a1a1a;
+    --black:       #0d0d0d;
+    --slate-light: #d4d4d4;
+    --slate-mid:   #b0b0b0;
+    --slate-dark:  #3a3a3a;
+    --card-bg:     #161616;
+    --border:      rgba(139,0,0,0.35);
+    --gold:        #c9a84c;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Tajawal', sans-serif;
+    background: var(--black);
+    color: var(--slate-light);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Noise texture overlay ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* ── Floating particles canvas ── */
+  #particleCanvas {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  /* ══════════ HEADER ══════════ */
+  header {
+    background: linear-gradient(135deg, var(--graphite) 0%, var(--black) 60%);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 4px 30px rgba(139,0,0,0.18);
+  }
+
+  .logo-block { display: flex; align-items: center; gap: 14px; }
+
+  .logo-icon {
+    width: 46px; height: 46px;
+    background: radial-gradient(circle at 40% 40%, var(--crimson-glow), var(--crimson));
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 0 20px rgba(196,30,58,0.4);
+    animation: logoPulse 3s ease-in-out infinite;
+  }
+  @keyframes logoPulse {
+    0%,100% { box-shadow: 0 0 20px rgba(196,30,58,0.4); transform: scale(1); }
+    50%      { box-shadow: 0 0 36px rgba(196,30,58,0.75), 0 0 60px rgba(196,30,58,0.2); transform: scale(1.06); }
+  }
+
+  .logo-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(135deg, var(--slate-light), var(--gold), var(--slate-mid));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    animation: shimmerText 4s linear infinite;
+    background-size: 200% auto;
+  }
+  @keyframes shimmerText {
+    0%   { background-position: 0% center; }
+    100% { background-position: 200% center; }
+  }
+
+  .logo-sub { font-size: 11px; color: var(--slate-mid); letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; }
+
+  .header-date { text-align: left; font-size: 13px; color: var(--slate-mid); letter-spacing: 1px; }
+  .header-date span { display: block; font-size: 17px; color: var(--slate-light); font-weight: 500; }
+
+  /* ══════════ NAV TABS ══════════ */
+  nav {
+    display: flex; gap: 2px;
+    padding: 0 32px;
+    background: var(--graphite);
+    border-bottom: 1px solid var(--border);
+    position: relative; z-index: 10;
+  }
+
+  .tab-btn {
+    background: none; border: none; cursor: pointer;
+    font-family: 'Tajawal', sans-serif; font-size: 14px;
+    color: var(--slate-mid); padding: 14px 24px; letter-spacing: 1px;
+    position: relative; transition: color .2s;
+    overflow: hidden;
+  }
+  .tab-btn::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+    height: 2px; background: var(--crimson-glow);
+    transform: scaleX(0); transition: transform .25s;
+  }
+  .tab-btn.active { color: var(--slate-light); }
+  .tab-btn.active::after { transform: scaleX(1); }
+  .tab-btn:hover { color: var(--slate-light); }
+
+  /* ══════════ MAIN ══════════ */
+  main { padding: 28px 32px; max-width: 1400px; margin: 0 auto; position: relative; z-index: 1; }
+
+  section { display: none; }
+  section.active { display: block; animation: slideUp .35s cubic-bezier(.22,.68,0,1.2); }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px) scale(.98); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* ══════════ CARDS ══════════ */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 24px; margin-bottom: 20px;
+    transition: box-shadow .3s;
+  }
+
+  .card-title {
+    font-family: 'Playfair Display', serif; font-size: 18px; color: var(--gold);
+    margin-bottom: 18px; display: flex; align-items: center; gap: 10px;
+  }
+  .card-title::before {
+    content: ''; width: 4px; height: 20px;
+    background: var(--crimson-glow); border-radius: 2px;
+  }
+
+  /* ══════════ FORM ══════════ */
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 12px; color: var(--slate-mid); letter-spacing: 1px; }
+
+  input, select {
+    background: #1f1f1f; border: 1px solid var(--slate-dark);
+    border-radius: 6px; padding: 10px 14px;
+    color: var(--slate-light); font-family: 'Tajawal', sans-serif; font-size: 14px;
+    outline: none; transition: border-color .2s, box-shadow .2s; width: 100%;
+  }
+  input:focus, select:focus {
+    border-color: var(--crimson); box-shadow: 0 0 0 3px rgba(139,0,0,0.2);
+  }
+  select option { background: #1f1f1f; }
+
+  /* ══════════ BUTTONS ══════════ */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer;
+    font-family: 'Tajawal', sans-serif; font-size: 14px; font-weight: 500;
+    transition: all .2s; letter-spacing: .5px; position: relative; overflow: hidden;
+  }
+  /* Ripple */
+  .btn .ripple {
+    position: absolute; border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    transform: scale(0); animation: rippleAnim .5s linear;
+    pointer-events: none;
+  }
+  @keyframes rippleAnim { to { transform: scale(4); opacity: 0; } }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--crimson), var(--crimson-glow));
+    color: #fff; box-shadow: 0 4px 14px rgba(139,0,0,0.35);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(139,0,0,0.5); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-secondary {
+    background: var(--slate-dark); color: var(--slate-light);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-secondary:hover { background: #4a4a4a; transform: translateY(-1px); }
+
+  .btn-danger { background: none; border: 1px solid var(--crimson); color: var(--crimson-glow); }
+  .btn-danger:hover { background: rgba(139,0,0,0.15); }
+
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+  .btn-gold {
+    background: linear-gradient(135deg, #8a6a20, var(--gold));
+    color: #0d0d0d; font-weight: 700;
+  }
+  .btn-gold:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(201,168,76,0.35); }
+
+  /* ══════════ TABLE ══════════ */
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    background: linear-gradient(135deg, #1e0000, var(--graphite));
+    color: var(--gold); padding: 13px 16px; text-align: right;
+    font-weight: 500; letter-spacing: .5px; white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background .15s; }
+  tbody tr:hover { background: rgba(139,0,0,0.07); }
+  tbody td { padding: 11px 16px; color: var(--slate-light); }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .badge-ok  { background: rgba(0,120,40,0.2);  color: #4caf50; border: 1px solid rgba(76,175,80,0.3); }
+  .badge-low { background: rgba(139,0,0,0.2);   color: var(--crimson-glow); border: 1px solid var(--border);
+               animation: badgePulse 2s ease-in-out infinite; }
+  @keyframes badgePulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  /* ══════════ STATS ROW ══════════ */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px; margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px;
+    position: relative; overflow: hidden;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(139,0,0,0.2); }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 4px; height: 100%;
+    background: linear-gradient(180deg, var(--crimson-glow), transparent);
+  }
+  .stat-label { font-size: 11px; color: var(--slate-mid); letter-spacing: 1px; margin-bottom: 6px; }
+  .stat-value { font-size: 26px; font-weight: 700; color: var(--slate-light); }
+  .stat-value.gold { color: var(--gold); }
+  .stat-unit  { font-size: 12px; color: var(--slate-mid); }
+
+  /* ══════════ CASHIER ══════════ */
+  .cashier-layout {
+    display: grid; grid-template-columns: 1fr 380px;
+    gap: 20px; align-items: start;
+  }
+
+  .perfume-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .perfume-card {
+    background: #1a0505; border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px;
+    cursor: pointer; transition: all .22s; user-select: none;
+    position: relative; overflow: hidden;
+  }
+  /* Shimmer sweep on perfume card */
+  .perfume-card::after {
+    content: '';
+    position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+    transition: left .45s;
+  }
+  .perfume-card:hover::after { left: 150%; }
+  .perfume-card:hover {
+    border-color: var(--crimson-glow);
+    background: rgba(139,0,0,0.15);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 28px rgba(139,0,0,0.3);
+  }
+  .perfume-card:active { transform: scale(.96); }
+
+  .perfume-card.adding {
+    animation: cardPop .35s cubic-bezier(.22,.68,0,1.4);
+  }
+  @keyframes cardPop { 0%{transform:scale(1)} 50%{transform:scale(.9)} 100%{transform:scale(1)} }
+
+  .perfume-card .pname { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+  .perfume-card .pml   { font-size: 11px; color: var(--slate-mid); margin-bottom: 4px; }
+  .perfume-card .pprice{ font-size: 13px; color: var(--gold); font-weight: 700; }
+  .perfume-card .pstock{ font-size: 11px; color: var(--slate-mid); }
+
+  /* ── Receipt panel ── */
+  .receipt-panel {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px;
+    position: sticky; top: 80px;
+    transition: border-color .4s, box-shadow .4s;
+  }
+  .receipt-panel.has-items {
+    border-color: rgba(201,168,76,0.4);
+    box-shadow: 0 0 30px rgba(201,168,76,0.07);
+  }
+
+  .receipt-header {
+    text-align: center; border-bottom: 1px solid var(--border);
+    padding-bottom: 14px; margin-bottom: 14px;
+  }
+  .receipt-header h3 { font-family: 'Playfair Display', serif; color: var(--gold); font-size: 16px; letter-spacing: 3px; }
+  .receipt-header p { font-size: 11px; color: var(--slate-mid); margin-top: 4px; }
+
+  .receipt-items { min-height: 120px; margin-bottom: 14px; }
+
+  .receipt-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px dashed rgba(255,255,255,0.06); gap: 8px;
+    animation: itemSlideIn .3s cubic-bezier(.22,.68,0,1.2);
+  }
+  @keyframes itemSlideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .receipt-item .ri-name { font-size: 13px; flex: 1; }
+  .receipt-item .ri-price{ font-size: 13px; color: var(--gold); white-space: nowrap; font-weight: 600; }
+
+  /* QTY stepper in receipt */
+  .qty-stepper { display: flex; align-items: center; gap: 4px; }
+  .qty-btn {
+    width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--slate-dark);
+    background: #2a2a2a; color: var(--slate-light); cursor: pointer;
+    font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  .qty-btn:hover { background: var(--crimson); border-color: var(--crimson); }
+  .qty-val { min-width: 22px; text-align: center; font-size: 13px; }
+  .ri-remove { background: none; border: none; color: var(--crimson); cursor: pointer; font-size: 14px; padding: 2px 4px; transition: transform .2s; }
+  .ri-remove:hover { transform: scale(1.3) rotate(90deg); color: var(--crimson-glow); }
+
+  .receipt-footer { border-top: 1px solid var(--border); padding-top: 14px; }
+  .receipt-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; color: var(--slate-mid); }
+  .receipt-row.total {
+    font-size: 18px; font-weight: 700; color: var(--slate-light);
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+  }
+  .receipt-row.total span:last-child { color: var(--gold); }
+
+  /* animated total */
+  #grandTotal { transition: transform .15s; }
+  #grandTotal.bump { animation: totalBump .3s cubic-bezier(.22,.68,0,1.6); }
+  @keyframes totalBump { 0%{transform:scale(1)} 50%{transform:scale(1.18)} 100%{transform:scale(1)} }
+
+  .receipt-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .receipt-actions .btn { flex: 1; justify-content: center; }
+
+  /* ══════════ QTY MODAL ══════════ */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.75);
+    backdrop-filter: blur(6px); z-index: 500;
+    display: none; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px; width: 340px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    animation: popIn .25s cubic-bezier(.22,.68,0,1.2);
+  }
+  @keyframes popIn { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal h3 { font-family: 'Playfair Display', serif; color: var(--gold); margin-bottom: 16px; font-size: 17px; }
+  .modal-body { margin-bottom: 18px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* ══════════ BURST PARTICLES ══════════ */
+  .burst-particle {
+    position: fixed; pointer-events: none; z-index: 9000;
+    width: 6px; height: 6px; border-radius: 50%;
+    animation: burstMove var(--dur, .7s) ease-out forwards;
+  }
+  @keyframes burstMove {
+    0%   { transform: translate(0,0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+  }
+
+  .settings-section { display: none; }
+  .settings-section.active { display: block; animation: slideUp .35s cubic-bezier(.22,.68,0,1.2); }
+
+  /* ══════════ EMPTY STATE ══════════ */
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--slate-mid); font-size: 14px; }
+  .empty-state .icon { font-size: 36px; margin-bottom: 10px; opacity: .4; animation: float 3s ease-in-out infinite; }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+
+  /* ══════════ TOAST ══════════ */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(10px);
+    background: linear-gradient(135deg, var(--crimson), var(--crimson-glow));
+    color: white; padding: 10px 22px; border-radius: 30px;
+    font-size: 14px; z-index: 9998; opacity: 0;
+    transition: opacity .3s, transform .3s; pointer-events: none;
+    box-shadow: 0 4px 20px rgba(139,0,0,0.4);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.success { background: linear-gradient(135deg, #1a5c2a, #2d8a44); }
+  #toast.warn    { background: linear-gradient(135deg, #5c4a1a, #8a6a20); }
+
+  /* ══════════ UTILS ══════════ */
+  .flex-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .mt-10 { margin-top: 10px; }
+  .mt-16 { margin-top: 16px; }
+  .ml-auto { margin-left: auto; }
+  .text-red { color: var(--crimson-glow); }
+  .text-gold { color: var(--gold); }
+  .w-full { width: 100%; }
+
+  /* ══════════ SETTINGS BTN ══════════ */
+  .settings-btn {
+    background: rgba(139,0,0,0.15);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--slate-mid);
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Tajawal', sans-serif; font-size: 14px;
+    padding: 10px 18px;
+    transition: all .25s;
+    letter-spacing: .5px;
+  }
+  .settings-btn:hover {
+    background: rgba(139,0,0,0.3);
+    border-color: var(--crimson-glow);
+    color: var(--slate-light);
+    box-shadow: 0 0 16px rgba(196,30,58,0.2);
+  }
+  .settings-btn .gear-icon {
+    font-size: 18px;
+    display: inline-block;
+    transition: transform .4s cubic-bezier(.22,.68,0,1.2);
+  }
+  .settings-btn:hover .gear-icon { transform: rotate(90deg); }
+
+  /* ══════════ SETTINGS OVERLAY ══════════ */
+  .settings-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+    display: none;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  .settings-overlay.open {
+    display: flex;
+    opacity: 0;
+    animation: overlayFadeIn .3s forwards;
+  }
+  @keyframes overlayFadeIn { to { opacity: 1; } }
+
+  .settings-panel {
+    position: fixed;
+    inset: 0;
+    background: var(--black);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 201;
+    transform: translateY(100%);
+    transition: transform .4s cubic-bezier(.22,.68,0,1.2);
+  }
+  .settings-overlay.open .settings-panel {
+    transform: translateY(0);
+  }
+
+  .settings-header {
+    background: linear-gradient(135deg, var(--graphite) 0%, var(--black) 60%);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    box-shadow: 0 4px 30px rgba(139,0,0,0.18);
+  }
+
+  .settings-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px; font-weight: 700;
+    color: var(--gold);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .settings-title::before {
+    content: '⚙️'; font-size: 22px;
+  }
+
+  .close-settings-btn {
+    background: none; border: 1px solid var(--border);
+    border-radius: 8px; color: var(--slate-mid);
+    cursor: pointer; padding: 9px 16px;
+    font-family: 'Tajawal', sans-serif; font-size: 14px;
+    display: flex; align-items: center; gap: 8px;
+    transition: all .2s;
+  }
+  .close-settings-btn:hover {
+    border-color: var(--crimson); color: var(--crimson-glow);
+    background: rgba(139,0,0,0.1);
+  }
+
+  .settings-nav {
+    display: flex; gap: 2px;
+    padding: 0 32px;
+    background: var(--graphite);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .settings-body {
+    flex: 1; overflow-y: auto; padding: 28px 32px;
+    max-width: 1400px; width: 100%; margin: 0 auto;
+  }
+
+  /* ══════════ CHECKOUT RECEIPT MODAL ══════════ */
+  .checkout-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.8);
+    backdrop-filter: blur(8px); z-index: 600;
+    display: none; align-items: center; justify-content: center;
+  }
+  .checkout-modal-overlay.open { display: flex; }
+  .checkout-modal {
+    background: var(--card-bg); border: 1px solid rgba(201,168,76,0.4);
+    border-radius: 14px; padding: 32px; width: min(500px, 95vw);
+    box-shadow: 0 0 60px rgba(201,168,76,0.1), 0 20px 60px rgba(0,0,0,.6);
+    animation: popIn .3s cubic-bezier(.22,.68,0,1.2);
+    max-height: 90vh; overflow-y: auto;
+  }
+  .checkout-modal-header {
+    text-align: center; margin-bottom: 24px;
+    padding-bottom: 16px; border-bottom: 1px solid var(--border);
+  }
+  .checkout-modal-header .success-icon {
+    font-size: 44px; margin-bottom: 10px;
+    animation: popIn .4s cubic-bezier(.22,.68,0,1.4);
+    display: block;
+  }
+  .checkout-modal-header h2 {
+    font-family: 'Playfair Display', serif;
+    color: var(--gold); font-size: 22px; margin-bottom: 4px;
+  }
+  .checkout-modal-header p { font-size: 12px; color: var(--slate-mid); letter-spacing: 1px; }
+
+  .checkout-inv-row {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: var(--slate-mid);
+    margin-bottom: 16px; padding-bottom: 12px;
+    border-bottom: 1px dashed rgba(255,255,255,0.08);
+  }
+  .checkout-inv-row strong { color: var(--gold); font-size: 14px; }
+
+  .checkout-items { margin-bottom: 16px; }
+  .checkout-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 0; border-bottom: 1px dashed rgba(255,255,255,0.05);
+    font-size: 13px;
+  }
+  .checkout-item .ci-name { flex: 1; }
+  .checkout-item .ci-qty  { color: var(--slate-mid); min-width: 50px; text-align: center; }
+  .checkout-item .ci-price{ color: var(--gold); font-weight: 600; }
+
+  .checkout-totals { padding: 14px 0; border-top: 1px solid var(--border); margin-bottom: 20px; }
+  .checkout-total-row {
+    display: flex; justify-content: space-between;
+    font-size: 13px; color: var(--slate-mid); margin-bottom: 6px;
+  }
+  .checkout-total-row.grand {
+    font-size: 20px; font-weight: 700;
+    color: var(--slate-light); margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .checkout-total-row.grand span:last-child { color: var(--gold); }
+
+  .checkout-modal-footer { display: flex; gap: 10px; }
+  .checkout-modal-footer .btn { flex: 1; justify-content: center; }
+
+  /* ══════════ BTN CHECKOUT ══════════ */
+  .btn-checkout {
+    background: linear-gradient(135deg, #1a5c2a, #2d8a44);
+    color: #fff; box-shadow: 0 4px 14px rgba(30,120,60,0.35);
+  }
+  .btn-checkout:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(30,120,60,0.5); }
+</style>
+</head>
+<body>
+
+<canvas id="particleCanvas"></canvas>
+
+<!-- ══════════ HEADER ══════════ -->
+<header>
+  <div class="logo-block">
+    <div class="logo-icon">🌸</div>
+    <div>
+      <div class="logo-text">VANILLA</div>
+      <div class="logo-sub">Perfumes & Fragrances</div>
+    </div>
+  </div>
+  <div class="header-date">
+    <div id="dateStr">—</div>
+    <span id="timeStr">—</span>
+  </div>
+  <button class="settings-btn" onclick="openSettings()">
+    <span class="gear-icon">⚙️</span>
+    الإعدادات
+  </button>
+</header>
+
+<!-- ══════════ SETTINGS OVERLAY ══════════ -->
+<div class="settings-overlay" id="settingsOverlay" onclick="handleOverlayClick(event)">
+  <div class="settings-panel">
+    <div class="settings-header">
+      <div class="settings-title">الإعدادات والتقارير</div>
+      <button class="close-settings-btn" onclick="closeSettings()">
+        ✕ إغلاق
+      </button>
+    </div>
+    <nav class="settings-nav">
+      <button class="tab-btn active" id="stab-inventory" onclick="switchSettingsTab('inventory', this)">📦 المخزون</button>
+      <button class="tab-btn" id="stab-add" onclick="switchSettingsTab('add', this)">➕ إضافة عطر</button>
+      <button class="tab-btn" id="stab-reports" onclick="switchSettingsTab('reports', this)">📊 التقارير</button>
+    </nav>
+    <div class="settings-body">
+
+      <!-- INVENTORY -->
+      <div id="stab-sec-inventory" class="settings-section active">
+        <div class="stats-row" id="statsRow"></div>
+        <div class="card">
+          <div class="card-title">قائمة المخزون</div>
+          <div class="flex-row" style="margin-bottom:14px;">
+            <input type="text" id="invSearch" placeholder="🔍 بحث..." style="max-width:260px;" oninput="renderInventoryTable()">
+            <button class="btn btn-secondary btn-sm ml-auto" onclick="exportCSV()">📥 تصدير CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th><th>اسم العطر</th><th>عدد الزجاجات</th><th>الحجم (مل)</th>
+                  <th>سعر المل</th><th>سعر الزجاجة</th><th>إجمالي القيمة</th><th>الحالة</th><th>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD PERFUME -->
+      <div id="stab-sec-add" class="settings-section">
+        <div class="card" style="max-width:600px;">
+          <div class="card-title">إضافة / تعديل عطر</div>
+          <div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1;">
+              <label>اسم العطر *</label>
+              <input type="text" id="addName" placeholder="مثال: Black Orchid">
+            </div>
+            <div class="form-group">
+              <label>الحجم (مل) *</label>
+              <input type="number" id="addMl" placeholder="100" min="1">
+            </div>
+            <div class="form-group">
+              <label>عدد الزجاجات *</label>
+              <input type="number" id="addBottles" placeholder="5" min="0">
+            </div>
+            <div class="form-group">
+              <label>سعر المللي (ج.م) *</label>
+              <input type="number" id="addPricePerMl" placeholder="2.50" min="0" step="0.01" oninput="calcBottlePrice()">
+            </div>
+            <div class="form-group">
+              <label>سعر الزجاجة (محسوب)</label>
+              <input type="number" id="addBottlePrice" placeholder="250.00" readonly style="opacity:.7;">
+            </div>
+            <div class="form-group">
+              <label>التصنيف</label>
+              <select id="addCategory">
+                <option>عطر رجالي</option><option>عطر نسائي</option>
+                <option>عطر مشترك</option><option>عود</option><option>برفان مركّز</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>الماركة</label>
+              <input type="text" id="addBrand" placeholder="مثال: Tom Ford">
+            </div>
+          </div>
+          <div class="flex-row mt-16">
+            <button class="btn btn-primary" onclick="savePerfume()">💾 حفظ</button>
+            <button class="btn btn-secondary" onclick="resetAddForm()">إعادة ضبط</button>
+          </div>
+          <div id="editingBadge" style="display:none;margin-top:10px;font-size:12px;color:var(--crimson-glow);">
+            ✏️ وضع التعديل — <span id="editingName"></span>
+            <button class="btn btn-danger btn-sm" style="margin-right:8px;" onclick="cancelEdit()">إلغاء</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPORTS -->
+      <div id="stab-sec-reports" class="settings-section">
+        <div class="stats-row" id="reportStats"></div>
+        <div class="card">
+          <div class="card-title">سجل المبيعات</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>التاريخ</th><th>الوقت</th><th>العناصر</th><th>الإجمالي</th></tr></thead>
+              <tbody id="salesTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /settings-body -->
+  </div><!-- /settings-panel -->
+</div><!-- /settings-overlay -->
+
+<main>
+
+<!-- ════════ CASHIER ════════ -->
+<section id="sec-cashier" class="active">
+  <div class="cashier-layout">
+    <div>
+      <div class="flex-row" style="margin-bottom:16px;">
+        <h2 style="font-family:'Playfair Display',serif;font-size:20px;color:var(--gold);">اختر العطور</h2>
+        <input type="text" id="searchInput" placeholder="🔍  ابحث عن عطر..." style="max-width:240px;" oninput="renderPerfumeGrid()">
+      </div>
+      <div class="perfume-grid" id="perfumeGrid"></div>
+    </div>
+
+    <!-- Receipt panel -->
+    <div class="receipt-panel" id="receiptPanel">
+      <div class="receipt-header">
+        <h3>VANILLA</h3>
+        <p>Perfumes & Fragrances · فاتورة المبيعات</p>
+        <p id="receiptDate" style="margin-top:4px;"></p>
+      </div>
+      <div class="receipt-items" id="receiptItems">
+        <div class="empty-state"><div class="icon">🧴</div>لم يتم اختيار عطور بعد</div>
+      </div>
+      <div class="receipt-footer">
+        <div class="receipt-row"><span>المجموع</span><span id="subTotal">0.00 ج.م</span></div>
+        <div class="receipt-row"><span>ضريبة (0%)</span><span>0.00 ج.م</span></div>
+        <div class="receipt-row total"><span>الإجمالي</span><span id="grandTotal">0.00 ج.م</span></div>
+        <div class="receipt-actions">
+          <button class="btn btn-danger btn-sm" onclick="clearReceipt()">🗑️ مسح</button>
+          <button class="btn btn-checkout" onclick="checkout()">✅ تأكيد البيع</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ════════ CHECKOUT MODAL ════════ -->
+<div class="checkout-modal-overlay" id="checkoutModal">
+  <div class="checkout-modal">
+    <div class="checkout-modal-header">
+      <span class="success-icon">✅</span>
+      <h2>تم البيع بنجاح</h2>
+      <p>VANILLA · Perfumes & Fragrances</p>
+    </div>
+    <div class="checkout-inv-row">
+      <span>رقم الفاتورة</span>
+      <strong id="checkoutInvNum">—</strong>
+    </div>
+    <div class="checkout-inv-row" style="margin-top:-8px">
+      <span>التاريخ والوقت</span>
+      <span id="checkoutDateTime" style="color:var(--slate-light);font-size:13px;">—</span>
+    </div>
+    <div class="checkout-items" id="checkoutItemsList"></div>
+    <div class="checkout-totals">
+      <div class="checkout-total-row"><span>المجموع الفرعي</span><span id="checkoutSubTotal">—</span></div>
+      <div class="checkout-total-row"><span>ضريبة (0%)</span><span>0.00 ج.م</span></div>
+      <div class="checkout-total-row grand"><span>الإجمالي</span><span id="checkoutGrandTotal">—</span></div>
+    </div>
+    <div style="text-align:center;padding:12px;background:rgba(201,168,76,0.07);border-radius:8px;margin-bottom:20px;font-size:12px;color:var(--slate-mid);line-height:1.8;">
+      شكراً لثقتكم بنا · تتمنى لكم يوماً عطراً<br>💫 نتشرف بخدمتكم دائماً
+    </div>
+    <div class="checkout-modal-footer">
+      <button class="btn btn-secondary" onclick="closeCheckoutModal()">✕ إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ QTY MODAL ════════ -->
+<div class="modal-overlay" id="qtyModal">
+  <div class="modal">
+    <h3 id="modalTitle">اختر الكمية</h3>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>عدد الزجاجات</label>
+        <input type="number" id="modalQty" value="1" min="1">
+      </div>
+      <div style="margin-top:8px;font-size:13px;color:var(--slate-mid);" id="modalPriceInfo"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">إلغاء</button>
+      <button class="btn btn-primary" onclick="confirmAddItem()">➕ إضافة</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ TOAST ════════ -->
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════
+   WEB AUDIO ENGINE
+═══════════════════════════════════════ */
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+
+function resumeAC() { if (AC.state === 'suspended') AC.resume(); }
+document.addEventListener('click', resumeAC, { once: true });
+
+function playTone(freq, type = 'sine', dur = 0.12, vol = 0.18, delay = 0) {
+  try {
+    const osc = AC.createOscillator();
+    const gain = AC.createGain();
+    osc.connect(gain); gain.connect(AC.destination);
+    osc.type = type; osc.frequency.value = freq;
+    const t = AC.currentTime + delay;
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.start(t); osc.stop(t + dur);
+  } catch(e) {}
+}
+
+const sfx = {
+  // soft double-beep on add to cart
+  add: () => {
+    playTone(880, 'sine', 0.08, 0.15);
+    playTone(1100, 'sine', 0.08, 0.12, 0.1);
+  },
+  // descending on remove
+  remove: () => {
+    playTone(440, 'triangle', 0.1, 0.1);
+    playTone(330, 'triangle', 0.1, 0.08, 0.09);
+  },
+  // cash register cha-ching on checkout
+  checkout: () => {
+    playTone(1320, 'sawtooth', 0.05, 0.12);
+    playTone(1760, 'sine',     0.08, 0.18, 0.06);
+    playTone(2093, 'sine',     0.10, 0.22, 0.14);
+    playTone(1047, 'sine',     0.12, 0.20, 0.25);
+    playTone(880,  'sine',     0.08, 0.12, 0.38);
+  },
+  // soft tick on tab
+  tab: () => { playTone(660, 'sine', 0.04, 0.07); },
+  // error buzz
+  error: () => {
+    playTone(180, 'sawtooth', 0.15, 0.18);
+    playTone(150, 'sawtooth', 0.15, 0.15, 0.13);
+  },
+  // save success
+  save: () => {
+    playTone(523, 'sine', 0.1, 0.12);
+    playTone(659, 'sine', 0.1, 0.12, 0.11);
+    playTone(784, 'sine', 0.12, 0.15, 0.22);
+  },
+  // clear beep
+  clear: () => { playTone(220, 'triangle', 0.18, 0.14); }
+};
+
+/* ═══════════════════════════════════════
+   FLOATING PARTICLE BACKGROUND
+═══════════════════════════════════════ */
+(function() {
+  const canvas = document.getElementById('particleCanvas');
+  const ctx = canvas.getContext('2d');
+  const emojis = ['🌸','✨','💫','🌹','⭐','🌟'];
+  let particles = [];
+
+  function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  resize(); window.addEventListener('resize', resize);
+
+  for (let i = 0; i < 18; i++) {
+    particles.push({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      emoji: emojis[Math.floor(Math.random() * emojis.length)],
+      size: 10 + Math.random() * 10,
+      speedX: (Math.random() - 0.5) * 0.3,
+      speedY: -0.2 - Math.random() * 0.3,
+      opacity: 0.1 + Math.random() * 0.2,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+
+  let frame = 0;
+  function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    frame++;
+    particles.forEach(p => {
+      p.x += p.speedX + Math.sin(frame * 0.01 + p.phase) * 0.2;
+      p.y += p.speedY;
+      if (p.y < -30) { p.y = canvas.height + 20; p.x = Math.random() * canvas.width; }
+      ctx.globalAlpha = p.opacity * (0.7 + 0.3 * Math.sin(frame * 0.02 + p.phase));
+      ctx.font = p.size + 'px serif';
+      ctx.fillText(p.emoji, p.x, p.y);
+    });
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+/* ═══════════════════════════════════════
+   RIPPLE EFFECT ON BUTTONS
+═══════════════════════════════════════ */
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn');
+  if (!btn) return;
+  const r = document.createElement('span');
+  r.className = 'ripple';
+  const rect = btn.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height);
+  r.style.cssText = `width:${size}px;height:${size}px;top:${e.clientY-rect.top-size/2}px;left:${e.clientX-rect.left-size/2}px`;
+  btn.appendChild(r);
+  setTimeout(() => r.remove(), 600);
+});
+
+/* ═══════════════════════════════════════
+   BURST PARTICLES
+═══════════════════════════════════════ */
+function burst(x, y, colors = ['#c9a84c','#C41E3A','#fff','#f0c060']) {
+  for (let i = 0; i < 14; i++) {
+    const p = document.createElement('div');
+    p.className = 'burst-particle';
+    const angle = (i / 14) * Math.PI * 2;
+    const dist = 50 + Math.random() * 60;
+    const dur = 0.5 + Math.random() * 0.3;
+    p.style.cssText = `
+      left:${x}px; top:${y}px;
+      background:${colors[i % colors.length]};
+      --tx:${Math.cos(angle)*dist}px;
+      --ty:${Math.sin(angle)*dist}px;
+      --dur:${dur}s;
+    `;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), dur * 1000 + 100);
+  }
+}
+
+/* ═══════════════════════════════════════
+   STATE
+═══════════════════════════════════════ */
+let perfumes = JSON.parse(localStorage.getItem('vanilla_perfumes') || '[]');
+let sales    = JSON.parse(localStorage.getItem('vanilla_sales')    || '[]');
+let cart     = [];
+let editingId = null;
+let pendingPerfume = null;
+
+/* ═══════════════════════════════════════
+   SEED DATA
+═══════════════════════════════════════ */
+if (!perfumes.length) {
+  perfumes = [
+    { id: uid(), name: 'Black Orchid',  ml: 100, bottles: 8,  pricePerMl: 3.50, category: 'عطر مشترك',   brand: 'Tom Ford' },
+    { id: uid(), name: 'Oud Al Layl',   ml: 50,  bottles: 12, pricePerMl: 5.00, category: 'عود',          brand: 'Arabian' },
+    { id: uid(), name: 'Rose Elixir',   ml: 75,  bottles: 6,  pricePerMl: 2.80, category: 'عطر نسائي',   brand: 'Vanilla' },
+    { id: uid(), name: 'Silver Shadow', ml: 100, bottles: 3,  pricePerMl: 2.00, category: 'عطر رجالي',   brand: 'Davidoff' },
+    { id: uid(), name: 'Vanilla Dream', ml: 50,  bottles: 15, pricePerMl: 4.20, category: 'برفان مركّز', brand: 'Vanilla' },
+  ];
+  save();
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function save() {
+  localStorage.setItem('vanilla_perfumes', JSON.stringify(perfumes));
+  localStorage.setItem('vanilla_sales',    JSON.stringify(sales));
+}
+
+/* ═══════════════════════════════════════
+   CLOCK
+═══════════════════════════════════════ */
+function clock() {
+  const now = new Date();
+  document.getElementById('dateStr').textContent =
+    now.toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  document.getElementById('timeStr').textContent = now.toLocaleTimeString('ar-EG');
+  document.getElementById('receiptDate').textContent = now.toLocaleString('ar-EG');
+}
+clock(); setInterval(clock, 1000);
+
+/* ═══════════════════════════════════════
+   ANIMATED COUNTER
+═══════════════════════════════════════ */
+function animateValue(el, from, to, dur = 300) {
+  const start = performance.now();
+  function step(now) {
+    const p = Math.min((now - start) / dur, 1);
+    const ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(from + (to - from) * ease) + ' ج.م';
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ═══════════════════════════════════════
+   SETTINGS PANEL
+═══════════════════════════════════════ */
+function openSettings() {
+  sfx.tab();
+  const overlay = document.getElementById('settingsOverlay');
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  // Load inventory by default
+  switchSettingsTab('inventory', document.getElementById('stab-inventory'));
+}
+
+function closeSettings() {
+  sfx.tab();
+  const overlay = document.getElementById('settingsOverlay');
+  overlay.classList.remove('open');
+  overlay.style.display = 'none';
+  // Refresh cashier grid after closing (stock may have changed)
+  renderPerfumeGrid();
+}
+
+function handleOverlayClick(e) {
+  // Only close if clicking the backdrop (not the panel)
+  if (e.target === document.getElementById('settingsOverlay')) closeSettings();
+}
+
+function switchSettingsTab(tab, btn) {
+  sfx.tab();
+  document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.settings-nav .tab-btn').forEach(b => b.classList.remove('active'));
+  const sec = document.getElementById('stab-sec-' + tab);
+  if (sec) sec.classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (tab === 'inventory') { renderStats(); renderInventoryTable(); }
+  if (tab === 'reports')   renderReports();
+}
+
+/* ═══════════════════════════════════════
+   TABS (legacy — kept for compatibility)
+═══════════════════════════════════════ */
+function switchTab(tab, btn) {
+  sfx.tab();
+  // If called for non-cashier tabs, open settings panel on that tab
+  if (tab !== 'cashier') {
+    openSettings();
+    const stabBtn = document.getElementById('stab-' + tab);
+    if (stabBtn) switchSettingsTab(tab, stabBtn);
+  }
+}
+
+/* ═══════════════════════════════════════
+   CASHIER
+═══════════════════════════════════════ */
+function renderPerfumeGrid() {
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const grid = document.getElementById('perfumeGrid');
+  const list = perfumes.filter(p => !q || p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q));
+  if (!list.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="icon">🔍</div>لا توجد نتائج</div>';
+    return;
+  }
+  grid.innerHTML = list.map(p => `
+    <div class="perfume-card" id="pc-${p.id}" onclick="openQtyModal('${p.id}', event)">
+      <div class="pname">${p.name}</div>
+      <div class="pml">${p.ml} مل · ${p.brand}</div>
+      <div class="pprice">${fmt(p.pricePerMl * p.ml)} ج.م</div>
+      <div class="pstock ${p.bottles <= 3 ? 'text-red' : ''}">${p.bottles > 0 ? p.bottles + ' زجاجة متاحة' : '❌ نفد المخزون'}</div>
+    </div>
+  `).join('');
+}
+
+function openQtyModal(id, event) {
+  pendingPerfume = perfumes.find(p => p.id === id);
+  if (!pendingPerfume || pendingPerfume.bottles < 1) {
+    sfx.error();
+    toast('لا يوجد مخزون كافي!', 'warn');
+    return;
+  }
+  // Card pop animation
+  const card = document.getElementById('pc-' + id);
+  if (card) { card.classList.add('adding'); setTimeout(() => card.classList.remove('adding'), 350); }
+
+  document.getElementById('modalTitle').textContent = pendingPerfume.name + ' — ' + pendingPerfume.ml + ' مل';
+  document.getElementById('modalQty').value = 1;
+  document.getElementById('modalQty').max = pendingPerfume.bottles;
+  updateModalPrice();
+  document.getElementById('qtyModal').classList.add('open');
+}
+
+document.getElementById('modalQty').addEventListener('input', updateModalPrice);
+function updateModalPrice() {
+  if (!pendingPerfume) return;
+  const q = parseInt(document.getElementById('modalQty').value) || 1;
+  const total = q * pendingPerfume.pricePerMl * pendingPerfume.ml;
+  document.getElementById('modalPriceInfo').textContent =
+    `سعر الزجاجة: ${fmt(pendingPerfume.pricePerMl * pendingPerfume.ml)} ج.م · المجموع: ${fmt(total)} ج.م`;
+}
+
+function closeModal() {
+  document.getElementById('qtyModal').classList.remove('open');
+  pendingPerfume = null;
+}
+
+function confirmAddItem(e) {
+  const q = Math.min(parseInt(document.getElementById('modalQty').value) || 1, pendingPerfume.bottles);
+  // save before closeModal nullifies pendingPerfume
+  const addedName = pendingPerfume.name;
+  const existing = cart.find(c => c.id === pendingPerfume.id);
+  if (existing) {
+    existing.qty = Math.min(existing.qty + q, pendingPerfume.bottles);
+  } else {
+    cart.push({ id: pendingPerfume.id, name: pendingPerfume.name, ml: pendingPerfume.ml,
+                pricePerMl: pendingPerfume.pricePerMl, qty: q, category: pendingPerfume.category });
+  }
+
+  burst(window.innerWidth * 0.5, window.innerHeight * 0.5);
+  sfx.add();
+
+  closeModal();
+  renderReceipt();
+  toast(`✅ ${addedName} × ${q}`, 'success');
+}
+
+/* ═══════════════════════════════════════
+   RECEIPT
+═══════════════════════════════════════ */
+function renderReceipt() {
+  const box = document.getElementById('receiptItems');
+  const panel = document.getElementById('receiptPanel');
+
+  if (!cart.length) {
+    box.innerHTML = '<div class="empty-state"><div class="icon">🧴</div>لم يتم اختيار عطور بعد</div>';
+    document.getElementById('subTotal').textContent = '0.00 ج.م';
+    document.getElementById('grandTotal').textContent = '0.00 ج.م';
+    panel.classList.remove('has-items');
+    return;
+  }
+
+  panel.classList.add('has-items');
+  let sub = 0;
+  box.innerHTML = cart.map((c, i) => {
+    const lineTotal = c.qty * c.pricePerMl * c.ml;
+    sub += lineTotal;
+    return `<div class="receipt-item">
+      <div class="ri-name">${c.name}<br><span style="font-size:10px;color:var(--slate-mid)">${c.ml}مل</span></div>
+      <div class="qty-stepper">
+        <button class="qty-btn" onclick="changeQty(${i},-1)">−</button>
+        <span class="qty-val">${c.qty}</span>
+        <button class="qty-btn" onclick="changeQty(${i},+1)">+</button>
+      </div>
+      <div class="ri-price">${fmt(lineTotal)} ج.م</div>
+      <button class="ri-remove" onclick="removeItem(${i})" title="حذف">✕</button>
+    </div>`;
+  }).join('');
+
+  const subEl = document.getElementById('subTotal');
+  const totalEl = document.getElementById('grandTotal');
+  const prevTotal = parseFloat(totalEl.textContent) || 0;
+
+  subEl.textContent = fmt(sub) + ' ج.م';
+  animateValue(totalEl, prevTotal, sub);
+
+  // Bump animation on total change
+  totalEl.classList.remove('bump');
+  void totalEl.offsetWidth;
+  totalEl.classList.add('bump');
+}
+
+function changeQty(i, delta) {
+  const item = cart[i];
+  const perfume = perfumes.find(p => p.id === item.id);
+  const maxQty = perfume ? perfume.bottles : 99;
+  item.qty = Math.max(1, Math.min(item.qty + delta, maxQty));
+  delta > 0 ? sfx.add() : sfx.remove();
+  renderReceipt();
+}
+
+function removeItem(i) {
+  sfx.remove();
+  const el = document.querySelectorAll('.receipt-item')[i];
+  if (el) {
+    el.style.transition = 'all .25s';
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(30px)';
+    setTimeout(() => { cart.splice(i, 1); renderReceipt(); }, 220);
+  } else {
+    cart.splice(i, 1); renderReceipt();
+  }
+}
+
+function clearReceipt() {
+  if (!cart.length) return;
+  sfx.clear();
+  cart = [];
+  renderReceipt();
+}
+
+/* ═══════════════════════════════════════
+   CHECKOUT — no print, show modal receipt
+═══════════════════════════════════════ */
+function checkout() {
+  if (!cart.length) { sfx.error(); toast('أضف عطراً على الأقل!', 'warn'); return; }
+
+  sfx.checkout();
+
+  // Burst from checkout button
+  const checkBtn = document.querySelector('.receipt-actions .btn-checkout');
+  if (checkBtn) {
+    const r = checkBtn.getBoundingClientRect();
+    burst(r.left + r.width / 2, r.top + r.height / 2, ['#c9a84c','#fff','#C41E3A','#ffd700']);
+  }
+
+  // Deduct stock
+  cart.forEach(c => {
+    const p = perfumes.find(x => x.id === c.id);
+    if (p) p.bottles = Math.max(0, p.bottles - c.qty);
+  });
+
+  // Record sale
+  const total = cart.reduce((s, c) => s + c.qty * c.pricePerMl * c.ml, 0);
+  const invoiceNum = 'INV-' + String(sales.length + 1).padStart(4, '0');
+  const now = new Date();
+  const saleItems = [...cart];
+  sales.push({ invoice: invoiceNum, date: now.toLocaleDateString('ar-EG'), time: now.toLocaleTimeString('ar-EG'), items: saleItems, total });
+  save();
+
+  // Populate checkout modal
+  document.getElementById('checkoutInvNum').textContent = invoiceNum;
+  document.getElementById('checkoutDateTime').textContent =
+    now.toLocaleDateString('ar-EG', { year:'numeric', month:'long', day:'numeric' }) + ' · ' + now.toLocaleTimeString('ar-EG');
+
+  document.getElementById('checkoutItemsList').innerHTML = saleItems.map(c => `
+    <div class="checkout-item">
+      <div class="ci-name">
+        <div style="font-weight:500">${c.name}</div>
+        <div style="font-size:11px;color:var(--slate-mid)">${c.ml} مل · ${c.category || ''}</div>
+      </div>
+      <div class="ci-qty">× ${c.qty}</div>
+      <div class="ci-price">${fmt(c.qty * c.pricePerMl * c.ml)} ج.م</div>
+    </div>
+  `).join('');
+
+  document.getElementById('checkoutSubTotal').textContent = fmt(total) + ' ج.م';
+  document.getElementById('checkoutGrandTotal').textContent = fmt(total) + ' ج.م';
+
+  // Show modal
+  document.getElementById('checkoutModal').classList.add('open');
+
+  // Clear cart and refresh grid
+  clearReceipt();
+  renderPerfumeGrid();
+}
+
+function closeCheckoutModal() {
+  document.getElementById('checkoutModal').classList.remove('open');
+}
+
+
+/* ═══════════════════════════════════════
+   INVENTORY
+═══════════════════════════════════════ */
+function renderStats() {
+  const totalVal    = perfumes.reduce((s, p) => s + p.bottles * p.pricePerMl * p.ml, 0);
+  const totalBottles= perfumes.reduce((s, p) => s + p.bottles, 0);
+  const lowStock    = perfumes.filter(p => p.bottles <= 3).length;
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="stat-label">عدد الأصناف</div><div class="stat-value" data-count="${perfumes.length}">0</div></div>
+    <div class="stat-card"><div class="stat-label">إجمالي الزجاجات</div><div class="stat-value" data-count="${totalBottles}">0</div></div>
+    <div class="stat-card"><div class="stat-label">مخزون منخفض</div><div class="stat-value text-red" data-count="${lowStock}">0</div></div>
+    <div class="stat-card"><div class="stat-label">قيمة المخزون</div><div class="stat-value gold" data-val="${totalVal}">0</div><div class="stat-unit">ج.م</div></div>
+  `;
+  // Animate stat numbers
+  document.querySelectorAll('.stat-value[data-count]').forEach(el => {
+    const target = parseInt(el.dataset.count);
+    let cur = 0;
+    const step = Math.max(1, Math.ceil(target / 30));
+    const iv = setInterval(() => {
+      cur = Math.min(cur + step, target);
+      el.textContent = cur;
+      if (cur >= target) clearInterval(iv);
+    }, 30);
+  });
+  document.querySelectorAll('.stat-value[data-val]').forEach(el => {
+    animateValue(el, 0, parseFloat(el.dataset.val), 600);
+  });
+}
+
+function renderInventoryTable() {
+  const q = (document.getElementById('invSearch')?.value || '').toLowerCase();
+  const list = perfumes.filter(p => !q || p.name.toLowerCase().includes(q) || p.brand?.toLowerCase().includes(q));
+  const tbody = document.getElementById('inventoryTbody');
+  tbody.innerHTML = list.map((p, i) => `
+    <tr style="animation:itemSlideIn .3s ${i*0.05}s both">
+      <td>${i+1}</td>
+      <td><strong>${p.name}</strong><br><span style="font-size:11px;color:var(--slate-mid)">${p.brand} · ${p.category}</span></td>
+      <td>${p.bottles}</td>
+      <td>${p.ml}</td>
+      <td>${fmt(p.pricePerMl)} ج.م</td>
+      <td>${fmt(p.pricePerMl * p.ml)} ج.م</td>
+      <td class="text-gold">${fmt(p.bottles * p.pricePerMl * p.ml)} ج.م</td>
+      <td><span class="badge ${p.bottles > 3 ? 'badge-ok' : 'badge-low'}">${p.bottles > 3 ? 'متوفر' : 'منخفض'}</span></td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="editPerfume('${p.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deletePerfume('${p.id}')">🗑️</button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--slate-mid)">لا توجد بيانات</td></tr>';
+}
+
+function deletePerfume(id) {
+  if (!confirm('هل أنت متأكد من الحذف؟')) return;
+  sfx.remove();
+  perfumes = perfumes.filter(p => p.id !== id);
+  save(); renderStats(); renderInventoryTable(); renderPerfumeGrid(); toast('تم الحذف 🗑️');
+}
+
+/* ═══════════════════════════════════════
+   ADD / EDIT
+═══════════════════════════════════════ */
+function calcBottlePrice() {
+  const ml = parseFloat(document.getElementById('addMl').value) || 0;
+  const pml = parseFloat(document.getElementById('addPricePerMl').value) || 0;
+  document.getElementById('addBottlePrice').value = ml && pml ? fmt(ml * pml) : '';
+}
+
+function savePerfume() {
+  const name    = document.getElementById('addName').value.trim();
+  const ml      = parseFloat(document.getElementById('addMl').value);
+  const bottles = parseInt(document.getElementById('addBottles').value);
+  const pml     = parseFloat(document.getElementById('addPricePerMl').value);
+  const cat     = document.getElementById('addCategory').value;
+  const brand   = document.getElementById('addBrand').value.trim();
+
+  if (!name || !ml || isNaN(bottles) || !pml) {
+    sfx.error(); toast('يرجى تعبئة جميع الحقول المطلوبة', 'warn'); return;
+  }
+
+  sfx.save();
+  if (editingId) {
+    const p = perfumes.find(x => x.id === editingId);
+    Object.assign(p, { name, ml, bottles, pricePerMl: pml, category: cat, brand });
+    toast('تم التعديل بنجاح ✓', 'success');
+  } else {
+    perfumes.push({ id: uid(), name, ml, bottles, pricePerMl: pml, category: cat, brand });
+    toast('تمت الإضافة بنجاح ✓', 'success');
+  }
+  save(); resetAddForm();
+}
+
+function editPerfume(id) {
+  sfx.tab();
+  const p = perfumes.find(x => x.id === id);
+  editingId = id;
+  document.getElementById('addName').value    = p.name;
+  document.getElementById('addMl').value      = p.ml;
+  document.getElementById('addBottles').value = p.bottles;
+  document.getElementById('addPricePerMl').value = p.pricePerMl;
+  document.getElementById('addCategory').value   = p.category;
+  document.getElementById('addBrand').value       = p.brand;
+  document.getElementById('addBottlePrice').value = fmt(p.pricePerMl * p.ml);
+  document.getElementById('editingBadge').style.display = 'block';
+  document.getElementById('editingName').textContent = p.name;
+  // Open settings panel on Add tab
+  openSettings();
+  switchSettingsTab('add', document.getElementById('stab-add'));
+}
+
+function cancelEdit() { sfx.tab(); resetAddForm(); }
+function resetAddForm() {
+  editingId = null;
+  ['addName','addMl','addBottles','addPricePerMl','addBottlePrice','addBrand']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('editingBadge').style.display = 'none';
+}
+
+/* ═══════════════════════════════════════
+   REPORTS
+═══════════════════════════════════════ */
+function renderReports() {
+  const totalRevenue = sales.reduce((s, x) => s + x.total, 0);
+  document.getElementById('reportStats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">عدد الفواتير</div><div class="stat-value" data-count="${sales.length}">0</div></div>
+    <div class="stat-card"><div class="stat-label">إجمالي الإيرادات</div><div class="stat-value gold" data-val="${totalRevenue}">0</div><div class="stat-unit">ج.م</div></div>
+  `;
+  document.querySelectorAll('.stat-value[data-count]').forEach(el => {
+    const target = parseInt(el.dataset.count); let cur = 0;
+    const step = Math.max(1, Math.ceil(target / 25));
+    const iv = setInterval(() => { cur = Math.min(cur + step, target); el.textContent = cur; if (cur >= target) clearInterval(iv); }, 35);
+  });
+  document.querySelectorAll('.stat-value[data-val]').forEach(el => animateValue(el, 0, parseFloat(el.dataset.val), 700));
+
+  const tbody = document.getElementById('salesTbody');
+  tbody.innerHTML = [...sales].reverse().map((s, i) => `
+    <tr style="animation:itemSlideIn .3s ${i*0.04}s both">
+      <td>${sales.length - i}</td>
+      <td>${s.date}</td>
+      <td>${s.time}</td>
+      <td>${s.items.map(x => x.name + '×' + x.qty).join(', ')}</td>
+      <td class="text-gold">${fmt(s.total)} ج.م</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--slate-mid)">لا توجد مبيعات بعد</td></tr>';
+}
+
+/* ═══════════════════════════════════════
+   EXPORT CSV
+═══════════════════════════════════════ */
+function exportCSV() {
+  sfx.save();
+  const rows = [['الاسم','الحجم (مل)','عدد الزجاجات','سعر المل','سعر الزجاجة','إجمالي القيمة','التصنيف','الماركة']];
+  perfumes.forEach(p => rows.push([p.name, p.ml, p.bottles, p.pricePerMl, p.pricePerMl*p.ml, p.bottles*p.pricePerMl*p.ml, p.category, p.brand]));
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + csv);
+  a.download = 'vanilla_inventory.csv'; a.click();
+}
+
+/* ═══════════════════════════════════════
+   UTILS
+═══════════════════════════════════════ */
+function fmt(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+
+let toastTimer;
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = type ? `show ${type}` : 'show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = '', 2500);
+}
+
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+renderPerfumeGrid();
+</script>
+</body>
+</html>
